@@ -190,6 +190,105 @@ class WeightedIOULocalizationLossTest(tf.test.TestCase):
       self.assertAllClose(loss_output, exp_loss)
 
 
+class WeightedGIoULocalizationLossTest(tf.test.TestCase):
+
+  def testReturnsCorrectLoss(self):
+    prediction_tensor = tf.constant([[[1.5, 0, 2.4, 1],
+                                      [0, 0, 1, 1],
+                                      [0, 0, .5, .25]]])
+    target_tensor = tf.constant([[[1.5, 0, 2.4, 1],
+                                  [0, 0, 1, 1],
+                                  [50, 50, 500.5, 100.25]]])
+    weights = [[1.0, .5, 2.0]]
+    loss_op = losses.WeightedGIoULocalizationLoss()
+    loss = loss_op(prediction_tensor, target_tensor, weights=weights)
+    exp_loss = [0,0,3.097665]
+    with self.test_session() as sess:
+      loss_output = sess.run(loss)
+      self.assertAllClose(loss_output, exp_loss)
+
+  def testReturnsCorrectLossWhenSwapped(self):
+    # ymin, xmin, ymax, xmax
+    # top, left, bottom, right
+    prediction_tensor = tf.constant([[[2.4, 0, 1.5, 1],
+                                      [0, 0, 1, 1],
+                                      [0, 0, .5, .25]]])
+    target_tensor = tf.constant([[[2.4, 0, 1.5, 1],
+                                  [0, 0, 1, 1],
+                                  [50, 50, 500.5, 100.25]]])
+    weights = [[1.0, .5, 2.0]]
+    loss_op = losses.WeightedGIoULocalizationLoss()
+    loss = loss_op(prediction_tensor, target_tensor, weights=weights)
+    exp_loss = [0,0,3.097665]
+    with self.test_session() as sess:
+      loss_output = sess.run(loss)
+      self.assertAllClose(loss_output, exp_loss)
+
+  def testReturnsCorrectLossSum(self):
+    prediction_tensor = tf.constant([[[1.5, 0, 2.4, 1],
+                                      [0, 0, 1, 1],
+                                      [0, 0, .5, .25]]])
+    target_tensor = tf.constant([[[1.5, 0, 2.4, 1],
+                                  [0, 0, 1, 1],
+                                  [50, 50, 500.5, 100.25]]])
+    weights = [[1.0, .5, 2.0]]
+    loss_op = losses.WeightedGIoULocalizationLoss()
+    loss = loss_op(prediction_tensor, target_tensor, weights=weights)
+    loss = tf.reduce_sum(loss)
+    exp_loss = 3.097665
+    with self.test_session() as sess:
+      loss_output = sess.run(loss)
+      self.assertAllClose(loss_output, exp_loss)
+
+  def testReturnsCorrectLossGrad(self):
+    batch_size = 1
+    prediction_tensor = tf.constant([[[1.5, 0, 2.4, 1],
+                                      [0, 0, 1, 1],
+                                      [0, 0, .5, .25]]])
+    target_tensor = tf.constant([[[1.5, 0, 2.4, 1],
+                                  [0, 0, 1, 1],
+                                  [50, 50, 500.5, 100.25]]])
+
+    x = np.random.rand(batch_size, 3, 4)
+    weights = np.random.rand(batch_size, 3, 4)
+    out_shape = (batch_size, 3, 4)
+
+    weights = np.array([[1.0, .5, 2.0]], dtype=np.float32)
+    loss_op = losses.WeightedGIoULocalizationLoss()
+    loss = loss_op(prediction_tensor, target_tensor, weights=weights)
+    loss_sum = tf.reduce_sum(loss)
+    exp_loss = 3.097665
+    with self.test_session() as sess:
+      x_ph = tf.placeholder(tf.float32, x.shape)
+      w_ph = tf.placeholder(tf.float32, weights.shape)
+      fd = {x_ph: x, w_ph: weights}
+      loss_output = sess.run(loss)
+      print("loss: {}".format(loss_output))
+      loss_sum_output = sess.run(loss_sum)
+      self.assertAllClose(loss_sum_output, exp_loss)
+      grad = tf.test.compute_gradient(w_ph, weights.shape, loss, out_shape, extra_feed_dict=fd)
+      print("grad: {}".format(grad))
+
+
+  def testReturnsCorrectLossWithNoLabels(self):
+    prediction_tensor = tf.constant([[[1.5, 0, 2.4, 1],
+                                      [0, 0, 1, 1],
+                                      [0, 0, .5, .25]]])
+    target_tensor = tf.constant([[[1.5, 0, 2.4, 1],
+                                  [0, 0, 1, 1],
+                                  [50, 50, 500.5, 100.25]]])
+    weights = [[1.0, .5, 2.0]]
+    losses_mask = tf.constant([False], tf.bool)
+    loss_op = losses.WeightedGIoULocalizationLoss()
+    loss = loss_op(prediction_tensor, target_tensor, weights=weights,
+                   losses_mask=losses_mask)
+    loss = tf.reduce_sum(loss)
+    exp_loss = 0.0
+    with self.test_session() as sess:
+      loss_output = sess.run(loss)
+      self.assertAllClose(loss_output, exp_loss)
+
+
 class WeightedSigmoidClassificationLossTest(tf.test.TestCase):
 
   def testReturnsCorrectLoss(self):

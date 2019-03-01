@@ -56,6 +56,27 @@ def area(boxlist, scope=None):
         value=boxlist.get(), num_or_size_splits=4, axis=1)
     return tf.squeeze((y_max - y_min) * (x_max - x_min), [1])
 
+def safe_boxlist(boxlist, scope=None):
+  """Checks the min/max of the boxlist
+
+  Handles cases where ymin/ymax xmin/max are swapped.
+
+  Args:
+    boxlist: BoxList holding N boxes
+    scope: name scope.
+
+  Returns:
+    a tensor with shape [N] representing box areas.
+  """
+  with tf.name_scope(scope, 'SafeBoxlist'):
+    y_min, x_min, y_max, x_max = tf.split(
+        value=boxlist.get(), num_or_size_splits=4, axis=1)
+    min_y = tf.reshape(tf.minimum(y_min, y_max), [-1])
+    max_y = tf.reshape(tf.maximum(y_min, y_max), [-1])
+    min_x = tf.reshape(tf.minimum(x_min, x_max), [-1])
+    max_x = tf.reshape(tf.maximum(x_min, x_max), [-1])
+    safe_boxes = tf.stack([min_y, min_x, max_y, max_x], axis=1)
+    return box_list.BoxList(safe_boxes)
 
 def height_width(boxlist, scope=None):
   """Computes height and width of boxes in boxlist.
@@ -252,6 +273,40 @@ def matched_intersection(boxlist1, boxlist2, scope=None):
     return tf.reshape(intersect_heights * intersect_widths, [-1])
 
 
+def matched_containing(boxlist1, boxlist2, scope=None):
+  """Compute the smallest axis-aligned bounding box that fully contains
+     a pair of corresponding boxes from two boxlists.
+
+  If you find this useful in research, please consider citing:
+
+    Generalized Intersection over Union: A Metric and A Loss for Bounding Box Regression
+    H. Rezatofighi, N. Tsoi, J. Gwak, A. Sadeghian, I. Reid, and S. Savarese.
+    CVPR 2019
+
+  This area containing both bounding boxes is called "C" in GIoU
+
+  Args:
+    boxlist1: BoxList holding N boxes
+    boxlist2: BoxList holding N boxes
+    scope: name scope.
+
+  Returns:
+    a tensor with shape [N] representing pairwise intersections
+  """
+  with tf.name_scope(scope, 'MatchedContaining'):
+    y_min1, x_min1, y_max1, x_max1 = tf.split(
+        value=boxlist1.get(), num_or_size_splits=4, axis=1)
+    y_min2, x_min2, y_max2, x_max2 = tf.split(
+        value=boxlist2.get(), num_or_size_splits=4, axis=1)
+    max_ymax = tf.maximum(y_max1, y_max2)
+    min_ymin = tf.minimum(y_min1, y_min2)
+    containing_heights = tf.maximum(0.0, max_ymax - min_ymin)
+    max_xmax = tf.maximum(x_max1, x_max2)
+    min_xmin = tf.minimum(x_min1, x_min2)
+    containing_widths = tf.maximum(0.0, max_xmax - min_xmin)
+    return tf.reshape(containing_heights * containing_widths, [-1])
+
+
 def iou(boxlist1, boxlist2, scope=None):
   """Computes pairwise intersection-over-union between box collections.
 
@@ -293,6 +348,41 @@ def matched_iou(boxlist1, boxlist2, scope=None):
     return tf.where(
         tf.equal(intersections, 0.0),
         tf.zeros_like(intersections), tf.truediv(intersections, unions))
+
+
+def matched_giou(boxlist1, boxlist2, scope=None):
+  """Compute generalized intersection-over-union between corresponding boxes in boxlists.
+
+  If you find this useful in research, please consider citing:
+
+    Generalized Intersection over Union: A Metric and A Loss for Bounding Box Regression
+    H. Rezatofighi, N. Tsoi, J. Gwak, A. Sadeghian, I. Reid, and S. Savarese.
+    CVPR 2019
+
+  Args:
+    boxlist1: BoxList holding N boxes
+    boxlist2: BoxList holding N boxes
+    scope: name scope.
+
+  Returns:
+    a tensor with shape [N] representing pairwise iou scores.
+  """
+  with tf.name_scope(scope, 'MatchedGIoU'):
+    epsilon = 0.00001
+    safe_boxlist1 = safe_boxlist(boxlist1)
+    safe_boxlist2 = safe_boxlist(boxlist2)
+    intersections = matched_intersection(safe_boxlist1, safe_boxlist2)
+    areas1 = area(safe_boxlist1)
+    areas2 = area(safe_boxlist2)
+    unions = areas1 + areas2 - intersections
+    iou = tf.where(
+          tf.equal(intersections, 0.0),
+          tf.zeros_like(intersections), tf.truediv(intersections, unions))
+    containings = matched_containing(safe_boxlist1, safe_boxlist2)
+    # this is the `C_term` in `GIoU = IoU - C_term` as described in the GIoU paper
+    unoccupied_area = tf.div_no_nan((containings - unions), containings)
+    giou = tf.subtract(iou, unoccupied_area)
+    return giou
 
 
 def ioa(boxlist1, boxlist2, scope=None):

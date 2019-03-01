@@ -218,6 +218,30 @@ class BoxListOpsTest(test_case.TestCase):
       iou_output = sess.run(iou)
       self.assertAllClose(iou_output, exp_output)
 
+  def test_matched_giou(self):
+    corners1 = tf.constant([[4.0, 3.0, 7.0, 5.0], [5.0, 6.0, 10.0, 7.0]])
+    corners2 = tf.constant([[3.0, 4.0, 6.0, 8.0], [14.0, 14.0, 15.0, 15.0]])
+    exp_output = [-0.07500000298023224, -0.9333333373069763]
+    boxes1 = box_list.BoxList(corners1)
+    boxes2 = box_list.BoxList(corners2)
+    iou = box_list_ops.matched_giou(boxes1, boxes2)
+    with self.test_session() as sess:
+      iou_output = sess.run(iou)
+      self.assertAllClose(iou_output, exp_output)
+
+  def test_matched_giou_when_swapped(self):
+    # ymin, xmin, ymax, xmax
+    # top, left, bottom, right
+    corners1 = tf.constant([[7.0, 3.0, 4.0, 5.0], [5.0, 6.0, 10.0, 7.0]])
+    corners2 = tf.constant([[3.0, 4.0, 6.0, 8.0], [14.0, 14.0, 15.0, 15.0]])
+    exp_output = [-0.07500000298023224, -0.9333333373069763]
+    boxes1 = box_list.BoxList(corners1)
+    boxes2 = box_list.BoxList(corners2)
+    iou = box_list_ops.matched_giou(boxes1, boxes2)
+    with self.test_session() as sess:
+      iou_output = sess.run(iou)
+      self.assertAllClose(iou_output, exp_output)
+
   def test_iouworks_on_empty_inputs(self):
     corners1 = tf.constant([[4.0, 3.0, 7.0, 5.0], [5.0, 6.0, 10.0, 7.0]])
     corners2 = tf.constant([[3.0, 4.0, 6.0, 8.0], [14.0, 14.0, 15.0, 15.0],

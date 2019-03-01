@@ -69,6 +69,7 @@ message LocalizationLoss {
     WeightedL2LocalizationLoss weighted_l2 = 1;
     WeightedSmoothL1LocalizationLoss weighted_smooth_l1 = 2;
     WeightedIOULocalizationLoss weighted_iou = 3;
+    WeightedGIoULocalizationLoss weighted_giou = 4;
   }
 }
 
@@ -94,6 +95,10 @@ message WeightedSmoothL1LocalizationLoss {
 
 // Intersection over union location loss: 1 - IOU
 message WeightedIOULocalizationLoss {
+}
+
+// Generalized Intersection over union location loss: 1 - IOU
+message WeightedGIoULocalizationLoss {
 }
 
 // Configuration for class prediction loss function.

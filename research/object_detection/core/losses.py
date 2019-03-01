@@ -181,6 +181,43 @@ class WeightedSmoothL1LocalizationLoss(Loss):
     ), axis=2)
 
 
+class WeightedGIoULocalizationLoss(Loss):
+  """GIoU localization loss function.
+
+  Sums the GIOU for corresponding pairs of predicted/groundtruth boxes
+  and for each pair assign a loss of 1 - GIoU.  We then compute a weighted
+  sum over all pairs which is returned as the total loss.
+
+  If you find this useful in research, please consider citing:
+
+    Generalized Intersection over Union: A Metric and A Loss for Bounding Box Regression
+    H. Rezatofighi, N. Tsoi, J. Gwak, A. Sadeghian, I. Reid, and S. Savarese.
+    CVPR 2019
+  """
+
+  def _compute_loss(self, prediction_tensor, target_tensor, weights):
+    """Compute loss function.
+
+    Args:
+      prediction_tensor: A float tensor of shape [batch_size, num_anchors, 4]
+        representing the decoded predicted boxes
+      target_tensor: A float tensor of shape [batch_size, num_anchors, 4]
+        representing the decoded target boxes
+      weights: a float tensor of shape [batch_size, num_anchors]
+
+    Returns:
+      loss: a float tensor of shape [batch_size, num_anchors] tensor
+        representing the value of the loss function.
+    """
+    predicted_boxes = box_list.BoxList(tf.reshape(prediction_tensor, [-1, 4]))
+    target_boxes = box_list.BoxList(tf.reshape(target_tensor, [-1, 4]))
+    matched_giou = box_list_ops.matched_giou(predicted_boxes, target_boxes)
+    w_ln = tf.exp(matched_giou)
+    per_anchor_giou_loss = 1.0 - w_ln
+    return tf.reshape(weights, [-1]) * per_anchor_giou_loss
+
+
+
 class WeightedIOULocalizationLoss(Loss):
   """IOU localization loss function.
 
