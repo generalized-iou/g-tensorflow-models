@@ -212,8 +212,7 @@ class WeightedGIoULocalizationLoss(Loss):
     predicted_boxes = box_list.BoxList(tf.reshape(prediction_tensor, [-1, 4]))
     target_boxes = box_list.BoxList(tf.reshape(target_tensor, [-1, 4]))
     matched_giou = box_list_ops.matched_giou(predicted_boxes, target_boxes)
-    w_ln = tf.exp(matched_giou)
-    per_anchor_giou_loss = 1.0 - w_ln
+    per_anchor_giou_loss = 1.0 - matched_giou
     return tf.reshape(weights, [-1]) * per_anchor_giou_loss
 
 
